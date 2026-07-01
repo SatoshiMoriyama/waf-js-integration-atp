@@ -1,12 +1,341 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`CdkStack スナップショットテスト 1`] = `
+exports[`LoginApiStack スナップショットテスト 1`] = `
 {
+  "Outputs": {
+    "LoginApiEndpointA4D30B2A": {
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Ref": "LoginApi53D879E8",
+            },
+            ".execute-api.",
+            {
+              "Ref": "AWS::Region",
+            },
+            ".",
+            {
+              "Ref": "AWS::URLSuffix",
+            },
+            "/",
+            {
+              "Ref": "LoginApiDeploymentStageprodC5CB5E24",
+            },
+            "/",
+          ],
+        ],
+      },
+    },
+    "LoginApiUrl": {
+      "Description": "ログインAPIのエンドポイントURL",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Ref": "LoginApi53D879E8",
+            },
+            ".execute-api.",
+            {
+              "Ref": "AWS::Region",
+            },
+            ".",
+            {
+              "Ref": "AWS::URLSuffix",
+            },
+            "/",
+            {
+              "Ref": "LoginApiDeploymentStageprodC5CB5E24",
+            },
+            "/login",
+          ],
+        ],
+      },
+    },
+  },
   "Parameters": {
     "BootstrapVersion": {
       "Default": "/cdk-bootstrap/hnb659fds/version",
       "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
       "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "LoginApi53D879E8": {
+      "Properties": {
+        "Name": "waf-js-atp-login-api",
+      },
+      "Type": "AWS::ApiGateway::RestApi",
+    },
+    "LoginApiAccount213CDE0D": {
+      "DeletionPolicy": "Retain",
+      "DependsOn": [
+        "LoginApi53D879E8",
+      ],
+      "Properties": {
+        "CloudWatchRoleArn": {
+          "Fn::GetAtt": [
+            "LoginApiCloudWatchRole0BA79139",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::ApiGateway::Account",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "LoginApiCloudWatchRole0BA79139": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "apigateway.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "LoginApiDeployment2E420A2722c4a63435fcf08ce1828728d689f5c2": {
+      "DependsOn": [
+        "LoginApiloginPOST2F863206",
+        "LoginApiloginB37D405E",
+      ],
+      "Metadata": {
+        "aws:cdk:do-not-refactor": true,
+      },
+      "Properties": {
+        "Description": "Automatically created by the RestApi construct",
+        "RestApiId": {
+          "Ref": "LoginApi53D879E8",
+        },
+      },
+      "Type": "AWS::ApiGateway::Deployment",
+    },
+    "LoginApiDeploymentStageprodC5CB5E24": {
+      "DependsOn": [
+        "LoginApiAccount213CDE0D",
+      ],
+      "Properties": {
+        "DeploymentId": {
+          "Ref": "LoginApiDeployment2E420A2722c4a63435fcf08ce1828728d689f5c2",
+        },
+        "RestApiId": {
+          "Ref": "LoginApi53D879E8",
+        },
+        "StageName": "prod",
+      },
+      "Type": "AWS::ApiGateway::Stage",
+    },
+    "LoginApiloginB37D405E": {
+      "Properties": {
+        "ParentId": {
+          "Fn::GetAtt": [
+            "LoginApi53D879E8",
+            "RootResourceId",
+          ],
+        },
+        "PathPart": "login",
+        "RestApiId": {
+          "Ref": "LoginApi53D879E8",
+        },
+      },
+      "Type": "AWS::ApiGateway::Resource",
+    },
+    "LoginApiloginPOST2F863206": {
+      "Properties": {
+        "AuthorizationType": "NONE",
+        "HttpMethod": "POST",
+        "Integration": {
+          "IntegrationHttpMethod": "POST",
+          "Type": "AWS_PROXY",
+          "Uri": {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":apigateway:",
+                {
+                  "Ref": "AWS::Region",
+                },
+                ":lambda:path/2015-03-31/functions/",
+                {
+                  "Fn::GetAtt": [
+                    "LoginFunction66F090C6",
+                    "Arn",
+                  ],
+                },
+                "/invocations",
+              ],
+            ],
+          },
+        },
+        "ResourceId": {
+          "Ref": "LoginApiloginB37D405E",
+        },
+        "RestApiId": {
+          "Ref": "LoginApi53D879E8",
+        },
+      },
+      "Type": "AWS::ApiGateway::Method",
+    },
+    "LoginApiloginPOSTApiPermissionTestStackLoginApiAC63B3C9POSTlogin3DA5E8D8": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "LoginFunction66F090C6",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:",
+              {
+                "Ref": "AWS::Region",
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId",
+              },
+              ":",
+              {
+                "Ref": "LoginApi53D879E8",
+              },
+              "/",
+              {
+                "Ref": "LoginApiDeploymentStageprodC5CB5E24",
+              },
+              "/POST/login",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "LoginApiloginPOSTApiPermissionTestTestStackLoginApiAC63B3C9POSTlogin12635D29": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "LoginFunction66F090C6",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:",
+              {
+                "Ref": "AWS::Region",
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId",
+              },
+              ":",
+              {
+                "Ref": "LoginApi53D879E8",
+              },
+              "/test-invoke-stage/POST/login",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "LoginFunction66F090C6": {
+      "DependsOn": [
+        "LoginFunctionServiceRole74B42ABA",
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
+          },
+          "S3Key": "f4fb0529b193074bf4d3ed97b4be8f4ba72e37074502c6fb4492c853b9e2c472.zip",
+        },
+        "Handler": "index.handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "LoginFunctionServiceRole74B42ABA",
+            "Arn",
+          ],
+        },
+        "Runtime": "python3.12",
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "LoginFunctionServiceRole74B42ABA": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
     },
   },
   "Rules": {
