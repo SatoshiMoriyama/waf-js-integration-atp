@@ -1,39 +1,59 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <title>ログイン(JS統合あり)</title>
-  <!-- TODO: WAF Web ACLのApplication integrationで取得したIntegration URLに置き換える -->
-  <script src="https://xxxx.token.awswaf.com/xxxx/challenge.js" defer></script>
-</head>
-<body>
-  <h2>ログイン(JS統合あり)</h2>
-  <input id="username" placeholder="username" value="test@example.com"><br>
-  <input id="password" type="password" placeholder="password" value="password123"><br>
-  <button onclick="login()">ログイン</button>
-  <pre id="result"></pre>
+  <head>
+    <meta charset="UTF-8" />
+    <title>ログイン(JS統合あり)</title>
+    <!-- TODO: WAF Web ACLのApplication integrationで取得したIntegration URLに置き換える -->
+    <script
+      src="https://xxxx.token.awswaf.com/xxxx/challenge.js"
+      defer
+      onerror="console.warn('challenge.js未設定のため通常のfetchで動作します')"
+    ></script>
+  </head>
+  <body>
+    <h2>ログイン(JS統合あり)</h2>
+    <input
+      id="username"
+      placeholder="username"
+      value="test@example.com"
+    /><br />
+    <input
+      id="password"
+      type="password"
+      placeholder="password"
+      value="password123"
+    /><br />
+    <button onclick="login()">ログイン</button>
+    <pre id="result"></pre>
 
-  <script>
-    // TODO: CDKデプロイ後に出力されるLoginApiUrlに置き換える
-    const API_URL = "https://kq2oc5ecbe.execute-api.ap-northeast-1.amazonaws.com/prod/login";
+    <script>
+      // TODO: CDKデプロイ後に出力されるLoginApiUrlに置き換える
+      const API_URL =
+        "https://kq2oc5ecbe.execute-api.ap-northeast-1.amazonaws.com/prod/login";
 
-    async function login() {
-      const body = JSON.stringify({
-        username: document.getElementById("username").value,
-        password: document.getElementById("password").value
-      });
+      async function login() {
+        const body = JSON.stringify({
+          username: document.getElementById("username").value,
+          password: document.getElementById("password").value,
+        });
 
-      // AwsWafIntegration.fetch がWAFトークンを自動付与してリクエストする
-      const res = await AwsWafIntegration.fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: body
-      });
+        // AwsWafIntegration.fetch がWAFトークンを自動付与してリクエストする
+        // (challenge.jsが未設定/未読み込みの場合は通常のfetchにフォールバック)
+        const fetchFn =
+          typeof AwsWafIntegration !== "undefined"
+            ? AwsWafIntegration.fetch
+            : fetch;
 
-      const text = await res.text();
-      document.getElementById("result").textContent =
-        `Status: ${res.status}\n${text}`;
-    }
-  </script>
-</body>
+        const res = await fetchFn(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: body,
+        });
+
+        const text = await res.text();
+        document.getElementById("result").textContent =
+          `Status: ${res.status}\n${text}`;
+      }
+    </script>
+  </body>
 </html>
