@@ -92,9 +92,9 @@ Web ACLを保存し、反映を待つ(数分程度)。
 origin が `null` になる file:// では正しく発行・送信されない)。
 そこで **AWS Amplify Hosting** の手動デプロイ(Gitリポジトリ不要)でホスティングする。
 
-### 6-1. login.htmlを作成
+### 6-1. index.htmlを作成
 
-ローカルPCに `login.html` として保存する。
+`packages/login-front/index.html` として作成済み(challenge.jsのURL、API_URLは後で置き換える)。
 
 ```html
 <!DOCTYPE html>
@@ -143,7 +143,8 @@ Amplifyの「Deploy without Git」はフォルダのドラッグ&ドロップ機
 `.zip` ファイルでのアップロードを推奨。
 
 ```bash
-zip login-site.zip login.html
+cd packages/login-front
+zip login-site.zip index.html
 ```
 
 1. Amplifyコンソール → **Create new app** → **Deploy without Git** → **Next**
@@ -159,7 +160,7 @@ zip login-site.zip login.html
    - これを設定しないと、challenge.jsがこのドメイン向けの有効なトークンを発行できない
 
 ### 確認ポイント
-- Amplifyで発行されたURL(`https://xxxx.amplifyapp.com/login.html`)にブラウザでアクセス
+- Amplifyで発行されたURL(`https://xxxx.amplifyapp.com/`)にブラウザでアクセス
 - ページを開いた時点で、裏で `challenge.js` がサイレントチャレンジを実行(ユーザー操作は不要)
 - 「ログイン」ボタンを押すと `AwsWafIntegration.fetch` がトークンを自動付与してAPIに送信
 - レスポンスが `200 login ok (mock)` になれば成功(WAFを通過)

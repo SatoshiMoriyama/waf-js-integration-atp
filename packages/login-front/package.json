@@ -1,0 +1,6 @@
+{
+  "name": "login-front",
+  "version": "0.1.0",
+  "private": true,
+  "description": "JS統合(challenge.js)を組み込んだログインページ(Amplify Hostingで配信)"
+}
