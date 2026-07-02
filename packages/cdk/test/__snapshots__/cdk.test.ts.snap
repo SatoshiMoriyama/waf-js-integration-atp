@@ -485,6 +485,9 @@ exports[`LoginApiStack スナップショットテスト 1`] = `
           },
         ],
         "Scope": "REGIONAL",
+        "TokenDomains": [
+          "main.dgpzwsaakidam.amplifyapp.com",
+        ],
         "VisibilityConfig": {
           "CloudWatchMetricsEnabled": true,
           "MetricName": "LoginWebAcl",

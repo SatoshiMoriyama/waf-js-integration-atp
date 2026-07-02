@@ -155,10 +155,19 @@ managedRuleGroupConfigs: [
 
 ## Step 5: JavaScript Integration の設定・取得
 
-1. WAFコンソール → 対象Web ACL → **Application integration** タブ
-2. **Intelligent threat integration** の設定を有効化
-3. 表示される `Integration URL` (challenge.jsの読み込み元)を控える
-   例: `https://xxxx.token.awswaf.com/xxxx/challenge.js`
+**つまづきポイント**: 「Web ACLの詳細画面の中にApplication integrationタブがある」わけではない。
+**WAFコンソールの左ナビゲーションペインに「Application integration」という独立した項目がある**ので、
+そこから遷移する。
+
+1. WAFコンソール(https://console.aws.amazon.com/wafv2/homev2)を開く
+2. 左ナビゲーションペインから **Application integration** を選択(Web ACLの中のタブではない)
+3. **Intelligent threat integration** タブを選択
+4. ATP等を使っているWeb ACL(`waf-js-atp-login-web-acl`)が一覧に出ているので選択
+5. 表示される `Integration URL` (challenge.jsの読み込み元スクリプトタグ)を控える
+   例:
+   ```html
+   <script type="text/javascript" src="https://xxxx.ap-northeast-1.sdk.awswaf.com/xxxx/yyyy/challenge.js" defer></script>
+   ```
 
 ---
 

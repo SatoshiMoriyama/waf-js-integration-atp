@@ -49,6 +49,10 @@ export class LoginApiStack extends cdk.Stack {
       name: 'waf-js-atp-login-web-acl',
       scope: 'REGIONAL',
       defaultAction: { allow: {} },
+      // Amplify Hosting(challenge.jsを読み込むページのホストドメイン)向けに
+      // 有効なWAFトークンを発行できるようにするための設定。
+      // これが無いと、challenge.jsが取得したトークンがこのWeb ACLでは受理されない。
+      tokenDomains: ['main.dgpzwsaakidam.amplifyapp.com'],
       visibilityConfig: {
         sampledRequestsEnabled: true,
         cloudWatchMetricsEnabled: true,
