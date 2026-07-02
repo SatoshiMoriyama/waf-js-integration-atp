@@ -32,6 +32,9 @@
         "https://kq2oc5ecbe.execute-api.ap-northeast-1.amazonaws.com/prod/login";
 
       async function login() {
+        const resultEl = document.getElementById("result");
+        resultEl.textContent = "送信中...";
+
         const body = JSON.stringify({
           username: document.getElementById("username").value,
           password: document.getElementById("password").value,
@@ -44,15 +47,20 @@
             ? AwsWafIntegration.fetch
             : fetch;
 
-        const res = await fetchFn(API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: body,
-        });
+        try {
+          const res = await fetchFn(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: body,
+          });
 
-        const text = await res.text();
-        document.getElementById("result").textContent =
-          `Status: ${res.status}\n${text}`;
+          const text = await res.text();
+          const label = res.ok ? "OK" : "NG (WAFにブロックされた可能性があります)";
+          resultEl.textContent = `[${label}] Status: ${res.status}\n${text}`;
+        } catch (err) {
+          // ネットワークエラーやCORSブロックなどでfetch自体が失敗した場合もここで表示する
+          resultEl.textContent = `[エラー] ${err.name}: ${err.message}`;
+        }
       }
     </script>
   </body>

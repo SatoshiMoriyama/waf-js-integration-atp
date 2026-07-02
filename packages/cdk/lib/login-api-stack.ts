@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 import * as cdk from 'aws-cdk-lib/core';
 import type { Construct } from 'constructs';
 
@@ -39,6 +40,69 @@ export class LoginApiStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'LoginApiUrl', {
       value: `${api.url}login`,
       description: 'ログインAPIのエンドポイントURL',
+    });
+
+    // ATP(Account Takeover Prevention)マネージドルールグループ
+    // overrideActionを{ none: {} }にすることでルールグループ本来のBlock動作になる
+    // (トークン無しのcurl等を403でブロックする)。挙動確認だけしたい場合は{ count: {} }に戻す。
+    const webAcl = new wafv2.CfnWebACL(this, 'LoginWebAcl', {
+      name: 'waf-js-atp-login-web-acl',
+      scope: 'REGIONAL',
+      defaultAction: { allow: {} },
+      visibilityConfig: {
+        sampledRequestsEnabled: true,
+        cloudWatchMetricsEnabled: true,
+        metricName: 'LoginWebAcl',
+      },
+      rules: [
+        {
+          name: 'ATPRule',
+          priority: 0,
+          overrideAction: { none: {} },
+          statement: {
+            managedRuleGroupStatement: {
+              vendorName: 'AWS',
+              name: 'AWSManagedRulesATPRuleSet',
+              managedRuleGroupConfigs: [
+                { loginPath: '/prod/login' },
+                { payloadType: 'JSON' },
+                { usernameField: { identifier: '/username' } },
+                { passwordField: { identifier: '/password' } },
+              ],
+            },
+          },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: 'ATPRule',
+          },
+        },
+        {
+          // ATPはボリューム攻撃や漏洩クレデンシャルの一致等を検知するルールで、
+          // 「トークンが無い」だけでは単体でブロックしない。
+          // そこでATPが付与するトークン状態ラベル(token:absent)にマッチしたら
+          // 明示的にブロックし、JS統合なし(curl等)のリクエストを拒否する。
+          name: 'BlockMissingTokenRule',
+          priority: 1,
+          action: { block: {} },
+          statement: {
+            labelMatchStatement: {
+              scope: 'LABEL',
+              key: 'awswaf:managed:token:absent',
+            },
+          },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: 'BlockMissingTokenRule',
+          },
+        },
+      ],
+    });
+
+    new wafv2.CfnWebACLAssociation(this, 'LoginWebAclAssociation', {
+      resourceArn: api.deploymentStage.stageArn,
+      webAclArn: webAcl.attrArn,
     });
   }
 }

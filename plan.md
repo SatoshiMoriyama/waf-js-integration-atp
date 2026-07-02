@@ -75,6 +75,82 @@ def handler(event, context):
 
 Web ACLを保存し、反映を待つ(数分程度)。
 
+### つまづきポイント: ATPだけでは「トークン無し」を単体でブロックしない
+
+ATP(`AWSManagedRulesATPRuleSet`)を`Block`モードにしても、curlで1回叩くだけでは
+**403にならず200が返ってくる**。これはATPの各ルールの検知条件が以下のようなもので、
+「トークンが無いこと」自体を単体でブロックする条件が存在しないため。
+
+- `VolumetricIpHigh` / `VolumetricSession`: 同一IP・同一セッションからの高頻度リクエスト
+- `AttributeCompromisedCredentials`: 送信された認証情報が漏洩クレデンシャルDBに一致
+- `AttributeUsernameTraversal` / `AttributePasswordTraversal`: ID/PWを変えながらの総当たり
+- `SignalMissingCredential`: リクエストボディにusername/passwordフィールドが無い
+
+つまりATPは「ブルートフォースや漏洩クレデンシャルの利用」を検知するルールであり、
+「JS統合を経由したか(トークンの有無)」を判定するルールではない。
+
+**対処**: ATPが付与するトークン状態ラベル`awswaf:managed:token:absent`にマッチする
+カスタムルールを、ATPの後(優先度を下げて)追加し、明示的にブロックする。
+
+```ts
+// ATP: priority 0, overrideAction: none (ブルートフォース・漏洩クレデンシャル検知)
+// カスタムルール: priority 1, トークン欠如(token:absent)ラベルでBlock
+{
+  name: 'BlockMissingTokenRule',
+  priority: 1,
+  action: { block: {} },
+  statement: {
+    labelMatchStatement: { scope: 'LABEL', key: 'awswaf:managed:token:absent' },
+  },
+  ...
+}
+```
+
+**ATPとカスタムルールは併用が正解**(どちらか一方だけでは不十分)。役割が異なる。
+
+- カスタムルールが守るもの: 「JS統合を経由したか」の1点(トークンの有無)
+- ATPが守るもの: トークンの有無に関係なく、ブルートフォースや漏洩クレデンシャルの利用
+  (ヘッドレスブラウザ等でトークンを正規取得しつつ総当たりするケースはカスタムルールだけでは防げない)
+
+コスト削減のためにATPを外してカスタムルールのみにする選択肢もあるが、
+それだと今回のシナリオの核心である「漏洩クレデンシャルを使ったブルートフォース」への
+防御力が無くなるため非推奨。
+
+### つまづきポイント: CloudFormation(CDK)でのManagedRuleGroupConfigsの構造
+
+CDKで`managedRuleGroupConfigs`を1つのオブジェクトにまとめて書くと、デプロイ時に
+以下のエラーになる。
+
+```
+Error reason: EXACTLY_ONE_CONDITION_REQUIRED, field: MANAGED_RULE_GROUP_CONFIG,
+parameter: ManagedRuleGroupConfig (Service: Wafv2, Status Code: 400, ...)
+```
+
+`ManagedRuleGroupConfigs`は配列の各要素に**条件を1つだけ**含める必要がある。
+NG例(1つのオブジェクトに複数フィールド):
+
+```ts
+managedRuleGroupConfigs: [
+  {
+    loginPath: '/prod/login',
+    payloadType: 'JSON',
+    usernameField: { identifier: '/username' },
+    passwordField: { identifier: '/password' },
+  },
+],
+```
+
+OK例(要素ごとに1条件):
+
+```ts
+managedRuleGroupConfigs: [
+  { loginPath: '/prod/login' },
+  { payloadType: 'JSON' },
+  { usernameField: { identifier: '/username' } },
+  { passwordField: { identifier: '/password' } },
+],
+```
+
 ---
 
 ## Step 5: JavaScript Integration の設定・取得

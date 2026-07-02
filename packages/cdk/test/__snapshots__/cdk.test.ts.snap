@@ -422,6 +422,111 @@ exports[`LoginApiStack スナップショットテスト 1`] = `
       },
       "Type": "AWS::IAM::Role",
     },
+    "LoginWebAcl": {
+      "Properties": {
+        "DefaultAction": {
+          "Allow": {},
+        },
+        "Name": "waf-js-atp-login-web-acl",
+        "Rules": [
+          {
+            "Name": "ATPRule",
+            "OverrideAction": {
+              "None": {},
+            },
+            "Priority": 0,
+            "Statement": {
+              "ManagedRuleGroupStatement": {
+                "ManagedRuleGroupConfigs": [
+                  {
+                    "LoginPath": "/prod/login",
+                  },
+                  {
+                    "PayloadType": "JSON",
+                  },
+                  {
+                    "UsernameField": {
+                      "Identifier": "/username",
+                    },
+                  },
+                  {
+                    "PasswordField": {
+                      "Identifier": "/password",
+                    },
+                  },
+                ],
+                "Name": "AWSManagedRulesATPRuleSet",
+                "VendorName": "AWS",
+              },
+            },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "ATPRule",
+              "SampledRequestsEnabled": true,
+            },
+          },
+          {
+            "Action": {
+              "Block": {},
+            },
+            "Name": "BlockMissingTokenRule",
+            "Priority": 1,
+            "Statement": {
+              "LabelMatchStatement": {
+                "Key": "awswaf:managed:token:absent",
+                "Scope": "LABEL",
+              },
+            },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "BlockMissingTokenRule",
+              "SampledRequestsEnabled": true,
+            },
+          },
+        ],
+        "Scope": "REGIONAL",
+        "VisibilityConfig": {
+          "CloudWatchMetricsEnabled": true,
+          "MetricName": "LoginWebAcl",
+          "SampledRequestsEnabled": true,
+        },
+      },
+      "Type": "AWS::WAFv2::WebACL",
+    },
+    "LoginWebAclAssociation": {
+      "Properties": {
+        "ResourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":apigateway:",
+              {
+                "Ref": "AWS::Region",
+              },
+              "::/restapis/",
+              {
+                "Ref": "LoginApi53D879E8",
+              },
+              "/stages/",
+              {
+                "Ref": "LoginApiDeploymentStageprodC5CB5E24",
+              },
+            ],
+          ],
+        },
+        "WebACLArn": {
+          "Fn::GetAtt": [
+            "LoginWebAcl",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::WAFv2::WebACLAssociation",
+    },
   },
   "Rules": {
     "CheckBootstrapVersion": {
