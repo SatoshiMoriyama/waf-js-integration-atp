@@ -265,6 +265,32 @@ curl -i -X POST "https://xxxx.execute-api.ap-northeast-1.amazonaws.com/prod/logi
 - **Countモードの場合**: `200`は返るが、CloudWatchログ上でATP関連ラベル
   (`awswaf:managed:aws:atp:...`)が付与されているのが確認できる
 
+### 実際の検証結果
+
+ATP + `BlockMissingTokenRule`(トークン欠如ブロックのカスタムルール)を併用した状態での実測。
+
+**ブラウザ経由(JS統合あり、Amplify Hosting)**
+```
+[OK] Status: 200
+{"message": "login ok (mock) for test@example.com"}
+```
+
+**curl直接POST(トークン無し)**
+```bash
+curl -i -X POST "https://kq2oc5ecbe.execute-api.ap-northeast-1.amazonaws.com/prod/login" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"test@example.com","password":"password123"}'
+```
+```
+HTTP/2 403
+content-type: application/json
+x-amzn-errortype: ForbiddenException
+{"message":"Forbidden"}
+```
+
+想定どおり、JS統合を経由したブラウザからのリクエストは`200`で通過し、
+トークンを持たないcurlの直接リクエストは`403`でブロックされることを確認できた。
+
 ---
 
 ## Step 8: CloudWatchメトリクス/ログで結果を確認
@@ -277,6 +303,35 @@ curl -i -X POST "https://xxxx.execute-api.ap-northeast-1.amazonaws.com/prod/logi
 ログを有効化していれば、CloudWatch Logsで以下のようなラベルが確認できる:
 ```
 awswaf:managed:aws:atp:...
+```
+
+### 実際のメトリクス確認結果
+
+CloudWatchメトリクス(`AWS/WAFV2`名前空間)をCLIで確認したところ、
+過去2時間で以下のようにルールごとのブロック数が分かれた。
+
+| ルール | ブロック数(過去2時間) | 内容 |
+|---|---|---|
+| `ATPRule` | 43件 | `VolumetricIpHigh`(同一IPからの高頻度アクセス)による検知 |
+| `BlockMissingTokenRule` | 2件 | curlでのトークン無し直接アクセス |
+
+**気づきポイント**: `ATPRule`のブロックはすべて`VolumetricIpHigh`によるもので、
+`get-sampled-requests`で確認すると**ブラウザ経由(Referer付き、Amplify Hostingのドメイン)の
+リクエストも含めてブロックされていた**。これは検証作業中に同一IPから短時間に
+繰り返しアクセスしたことでATPのボリューム攻撃検知(10分間に20リクエスト超)に
+引っかかったため。
+
+つまりATPは「JS統合の有無」に関係なく、**頻度が高すぎれば正規のブラウザ経由の
+アクセスもブロックする**。これは実運用でも起こりうる挙動で、通常利用のユーザーが
+誤ってブロックされる可能性(過検知)も考慮した閾値設計・監視が必要になる。
+
+サンプルリクエストの取得コマンド例:
+```bash
+aws wafv2 get-sampled-requests \
+  --web-acl-arn "arn:aws:wafv2:<region>:<account>:regional/webacl/<name>/<id>" \
+  --rule-metric-name ATPRule --scope REGIONAL \
+  --time-window StartTime=<ISO8601>,EndTime=<ISO8601> \
+  --max-items 5
 ```
 
 ---
