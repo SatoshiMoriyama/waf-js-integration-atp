@@ -22,6 +22,12 @@ export class LoginApiStack extends cdk.Stack {
       deployOptions: {
         stageName: 'prod',
       },
+      defaultCorsPreflightOptions: {
+        // Amplify Hosting(別オリジン)からのfetchを許可するためCORSを有効化
+        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowMethods: ['POST', 'OPTIONS'],
+        allowHeaders: ['Content-Type', 'x-aws-waf-token'],
+      },
     });
 
     const loginResource = api.root.addResource('login');

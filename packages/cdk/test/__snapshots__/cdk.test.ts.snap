@@ -120,10 +120,12 @@ exports[`LoginApiStack スナップショットテスト 1`] = `
       "Type": "AWS::IAM::Role",
       "UpdateReplacePolicy": "Retain",
     },
-    "LoginApiDeployment2E420A2722c4a63435fcf08ce1828728d689f5c2": {
+    "LoginApiDeployment2E420A2700458e25fbd70cbba2cbb44118ded105": {
       "DependsOn": [
+        "LoginApiloginOPTIONS7A871FE9",
         "LoginApiloginPOST2F863206",
         "LoginApiloginB37D405E",
+        "LoginApiOPTIONS0CA534DF",
       ],
       "Metadata": {
         "aws:cdk:do-not-refactor": true,
@@ -142,7 +144,7 @@ exports[`LoginApiStack スナップショットテスト 1`] = `
       ],
       "Properties": {
         "DeploymentId": {
-          "Ref": "LoginApiDeployment2E420A2722c4a63435fcf08ce1828728d689f5c2",
+          "Ref": "LoginApiDeployment2E420A2700458e25fbd70cbba2cbb44118ded105",
         },
         "RestApiId": {
           "Ref": "LoginApi53D879E8",
@@ -150,6 +152,49 @@ exports[`LoginApiStack スナップショットテスト 1`] = `
         "StageName": "prod",
       },
       "Type": "AWS::ApiGateway::Stage",
+    },
+    "LoginApiOPTIONS0CA534DF": {
+      "Properties": {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "HttpMethod": "OPTIONS",
+        "Integration": {
+          "IntegrationResponses": [
+            {
+              "ResponseParameters": {
+                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,x-aws-waf-token'",
+                "method.response.header.Access-Control-Allow-Methods": "'POST,OPTIONS'",
+                "method.response.header.Access-Control-Allow-Origin": "'*'",
+              },
+              "StatusCode": "204",
+            },
+          ],
+          "RequestTemplates": {
+            "application/json": "{ statusCode: 200 }",
+          },
+          "Type": "MOCK",
+        },
+        "MethodResponses": [
+          {
+            "ResponseParameters": {
+              "method.response.header.Access-Control-Allow-Headers": true,
+              "method.response.header.Access-Control-Allow-Methods": true,
+              "method.response.header.Access-Control-Allow-Origin": true,
+            },
+            "StatusCode": "204",
+          },
+        ],
+        "ResourceId": {
+          "Fn::GetAtt": [
+            "LoginApi53D879E8",
+            "RootResourceId",
+          ],
+        },
+        "RestApiId": {
+          "Ref": "LoginApi53D879E8",
+        },
+      },
+      "Type": "AWS::ApiGateway::Method",
     },
     "LoginApiloginB37D405E": {
       "Properties": {
@@ -165,6 +210,46 @@ exports[`LoginApiStack スナップショットテスト 1`] = `
         },
       },
       "Type": "AWS::ApiGateway::Resource",
+    },
+    "LoginApiloginOPTIONS7A871FE9": {
+      "Properties": {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "HttpMethod": "OPTIONS",
+        "Integration": {
+          "IntegrationResponses": [
+            {
+              "ResponseParameters": {
+                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,x-aws-waf-token'",
+                "method.response.header.Access-Control-Allow-Methods": "'POST,OPTIONS'",
+                "method.response.header.Access-Control-Allow-Origin": "'*'",
+              },
+              "StatusCode": "204",
+            },
+          ],
+          "RequestTemplates": {
+            "application/json": "{ statusCode: 200 }",
+          },
+          "Type": "MOCK",
+        },
+        "MethodResponses": [
+          {
+            "ResponseParameters": {
+              "method.response.header.Access-Control-Allow-Headers": true,
+              "method.response.header.Access-Control-Allow-Methods": true,
+              "method.response.header.Access-Control-Allow-Origin": true,
+            },
+            "StatusCode": "204",
+          },
+        ],
+        "ResourceId": {
+          "Ref": "LoginApiloginB37D405E",
+        },
+        "RestApiId": {
+          "Ref": "LoginApi53D879E8",
+        },
+      },
+      "Type": "AWS::ApiGateway::Method",
     },
     "LoginApiloginPOST2F863206": {
       "Properties": {
@@ -293,7 +378,7 @@ exports[`LoginApiStack スナップショットテスト 1`] = `
           "S3Bucket": {
             "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
           },
-          "S3Key": "f4fb0529b193074bf4d3ed97b4be8f4ba72e37074502c6fb4492c853b9e2c472.zip",
+          "S3Key": "af4beb4494333bd6e88d326c114a6b59ad7363fc4956614f16387c311afa414f.zip",
         },
         "Handler": "index.handler",
         "Role": {
