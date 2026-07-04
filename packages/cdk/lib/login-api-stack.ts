@@ -67,11 +67,19 @@ export class LoginApiStack extends cdk.Stack {
             managedRuleGroupStatement: {
               vendorName: 'AWS',
               name: 'AWSManagedRulesATPRuleSet',
+              // AWSManagedRulesATPRuleSetプロパティにネストする形式が現在の推奨(旧フラット形式は非推奨)。
+              // 参考: https://docs.aws.amazon.com/waf/latest/developerguide/waf-tokens-block-missing-tokens.html
               managedRuleGroupConfigs: [
-                { loginPath: '/prod/login' },
-                { payloadType: 'JSON' },
-                { usernameField: { identifier: '/username' } },
-                { passwordField: { identifier: '/password' } },
+                {
+                  awsManagedRulesAtpRuleSet: {
+                    loginPath: '/prod/login',
+                    requestInspection: {
+                      payloadType: 'JSON',
+                      usernameField: { identifier: '/username' },
+                      passwordField: { identifier: '/password' },
+                    },
+                  },
+                },
               ],
             },
           },
@@ -86,13 +94,37 @@ export class LoginApiStack extends cdk.Stack {
           // 「トークンが無い」だけでは単体でブロックしない。
           // そこでATPが付与するトークン状態ラベル(token:absent)にマッチしたら
           // 明示的にブロックし、JS統合なし(curl等)のリクエストを拒否する。
+          // ログインパス・POSTメソッドへの絞り込みはAWS公式サンプルに合わせたもの
+          // (ATPルールグループの評価スコープと一致させ、他エンドポイントへの誤爆を防ぐため)。
           name: 'BlockMissingTokenRule',
           priority: 1,
           action: { block: {} },
           statement: {
-            labelMatchStatement: {
-              scope: 'LABEL',
-              key: 'awswaf:managed:token:absent',
+            andStatement: {
+              statements: [
+                {
+                  labelMatchStatement: {
+                    scope: 'LABEL',
+                    key: 'awswaf:managed:token:absent',
+                  },
+                },
+                {
+                  byteMatchStatement: {
+                    searchString: '/prod/login',
+                    fieldToMatch: { uriPath: {} },
+                    textTransformations: [{ priority: 0, type: 'NONE' }],
+                    positionalConstraint: 'STARTS_WITH',
+                  },
+                },
+                {
+                  byteMatchStatement: {
+                    searchString: 'POST',
+                    fieldToMatch: { method: {} },
+                    textTransformations: [{ priority: 0, type: 'NONE' }],
+                    positionalConstraint: 'EXACTLY',
+                  },
+                },
+              ],
             },
           },
           visibilityConfig: {

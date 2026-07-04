@@ -439,19 +439,17 @@ exports[`LoginApiStack スナップショットテスト 1`] = `
               "ManagedRuleGroupStatement": {
                 "ManagedRuleGroupConfigs": [
                   {
-                    "LoginPath": "/prod/login",
-                  },
-                  {
-                    "PayloadType": "JSON",
-                  },
-                  {
-                    "UsernameField": {
-                      "Identifier": "/username",
-                    },
-                  },
-                  {
-                    "PasswordField": {
-                      "Identifier": "/password",
+                    "AWSManagedRulesATPRuleSet": {
+                      "LoginPath": "/prod/login",
+                      "RequestInspection": {
+                        "PasswordField": {
+                          "Identifier": "/password",
+                        },
+                        "PayloadType": "JSON",
+                        "UsernameField": {
+                          "Identifier": "/username",
+                        },
+                      },
                     },
                   },
                 ],
@@ -472,9 +470,45 @@ exports[`LoginApiStack スナップショットテスト 1`] = `
             "Name": "BlockMissingTokenRule",
             "Priority": 1,
             "Statement": {
-              "LabelMatchStatement": {
-                "Key": "awswaf:managed:token:absent",
-                "Scope": "LABEL",
+              "AndStatement": {
+                "Statements": [
+                  {
+                    "LabelMatchStatement": {
+                      "Key": "awswaf:managed:token:absent",
+                      "Scope": "LABEL",
+                    },
+                  },
+                  {
+                    "ByteMatchStatement": {
+                      "FieldToMatch": {
+                        "UriPath": {},
+                      },
+                      "PositionalConstraint": "STARTS_WITH",
+                      "SearchString": "/prod/login",
+                      "TextTransformations": [
+                        {
+                          "Priority": 0,
+                          "Type": "NONE",
+                        },
+                      ],
+                    },
+                  },
+                  {
+                    "ByteMatchStatement": {
+                      "FieldToMatch": {
+                        "Method": {},
+                      },
+                      "PositionalConstraint": "EXACTLY",
+                      "SearchString": "POST",
+                      "TextTransformations": [
+                        {
+                          "Priority": 0,
+                          "Type": "NONE",
+                        },
+                      ],
+                    },
+                  },
+                ],
               },
             },
             "VisibilityConfig": {

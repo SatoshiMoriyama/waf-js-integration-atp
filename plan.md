@@ -79,7 +79,8 @@ Web ACLを保存し、反映を待つ(数分程度)。
 
 ATP(`AWSManagedRulesATPRuleSet`)を`Block`モードにしても、curlで1回叩くだけでは
 **403にならず200が返ってくる**。これはATPの各ルールの検知条件が以下のようなもので、
-「トークンが無いこと」自体を単体でブロックする条件が存在しないため。
+「トークンが無いこと」自体を単体でブロックする条件が存在しないため
+(ルール一覧の根拠: [AWS WAF Fraud Control account takeover prevention (ATP) rule group](https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-atp.html))。
 
 - `VolumetricIpHigh` / `VolumetricSession`: 同一IP・同一セッションからの高頻度リクエスト
 - `AttributeCompromisedCredentials`: 送信された認証情報が漏洩クレデンシャルDBに一致
@@ -89,8 +90,10 @@ ATP(`AWSManagedRulesATPRuleSet`)を`Block`モードにしても、curlで1回叩
 つまりATPは「ブルートフォースや漏洩クレデンシャルの利用」を検知するルールであり、
 「JS統合を経由したか(トークンの有無)」を判定するルールではない。
 
-**対処**: ATPが付与するトークン状態ラベル`awswaf:managed:token:absent`にマッチする
-カスタムルールを、ATPの後(優先度を下げて)追加し、明示的にブロックする。
+**対処**: ATPが付与するトークン状態ラベル`awswaf:managed:token:absent`
+(ラベルの根拠: [Types of token labels in AWS WAF](https://docs.aws.amazon.com/waf/latest/developerguide/waf-tokens-labeling.html))
+にマッチするカスタムルールを、ATPの後(優先度を下げて)追加し、明示的にブロックする。
+この対処自体もAWS公式が推奨する方法(詳細はStep6の実験セクションを参照)。
 
 ```ts
 // ATP: priority 0, overrideAction: none (ブルートフォース・漏洩クレデンシャル検知)
@@ -126,7 +129,8 @@ Error reason: EXACTLY_ONE_CONDITION_REQUIRED, field: MANAGED_RULE_GROUP_CONFIG,
 parameter: ManagedRuleGroupConfig (Service: Wafv2, Status Code: 400, ...)
 ```
 
-`ManagedRuleGroupConfigs`は配列の各要素に**条件を1つだけ**含める必要がある。
+`ManagedRuleGroupConfigs`は配列の各要素に**条件を1つだけ**含める必要がある
+(構造の根拠: [AWS::WAFv2::WebACL ManagedRuleGroupStatement](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-wafv2-webacl-managedrulegroupstatement.md)の設定例)。
 NG例(1つのオブジェクトに複数フィールド):
 
 ```ts
@@ -157,7 +161,8 @@ managedRuleGroupConfigs: [
 
 **つまづきポイント**: 「Web ACLの詳細画面の中にApplication integrationタブがある」わけではない。
 **WAFコンソールの左ナビゲーションペインに「Application integration」という独立した項目がある**ので、
-そこから遷移する。
+そこから遷移する
+(手順の根拠: [Accessing the AWS WAF client application integration APIs](https://docs.aws.amazon.com/waf/latest/developerguide/waf-application-integration-location-in-console.html))。
 
 1. WAFコンソール(https://console.aws.amazon.com/wafv2/homev2)を開く
 2. 左ナビゲーションペインから **Application integration** を選択(Web ACLの中のタブではない)
@@ -243,12 +248,106 @@ zip login-site.zip index.html
 1. WAFコンソール → 対象Web ACL → **Application integration** タブ → **Token domain list**
 2. Amplifyで発行されたドメイン(例: `demo.xxxxxxxxxx.amplifyapp.com`)を追加して保存
    - これを設定しないと、challenge.jsがこのドメイン向けの有効なトークンを発行できない
+   - 仕様の根拠: [Specifying token domains and domain lists in AWS WAF](https://docs.aws.amazon.com/waf/latest/developerguide/waf-tokens-domains.html) —
+     「Token domain listを指定しない場合、WAFは保護対象リソースのドメインのトークンのみ受理する」
 
 ### 確認ポイント
 - Amplifyで発行されたURL(`https://xxxx.amplifyapp.com/`)にブラウザでアクセス
 - ページを開いた時点で、裏で `challenge.js` がサイレントチャレンジを実行(ユーザー操作は不要)
 - 「ログイン」ボタンを押すと `AwsWafIntegration.fetch` がトークンを自動付与してAPIに送信
 - レスポンスが `200 login ok (mock)` になれば成功(WAFを通過)
+
+### 補足: WAFトークン(`x-aws-waf-token`)の中身と有効期限
+
+`AwsWafIntegration.fetch`が自動付与するトークンは、リクエストヘッダー
+`x-aws-waf-token`として送信される。ブラウザの開発者ツール(Network タブ)や
+`aws-waf-token`Cookie(Application/Storageタブ)で実際の値を確認できる。
+
+**トークンの構造(概形)**
+
+```
+<セッションID(UUID)>:<短いメタデータ>:<暗号化されたペイロード>
+```
+
+例(ダミー値):
+```
+xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx:AQoAxxxxxxxxAAAA:<base64っぽい暗号化データ>
+```
+
+暗号化ペイロードの中身自体は非公開だが、[AWS公式ドキュメント](https://docs.aws.amazon.com/waf/latest/developerguide/waf-tokens-details.html)
+によると以下の情報が含まれるとされている。
+
+- silent challengeへの最新の成功応答のタイムスタンプ
+- CAPTCHAへの最新の成功応答のタイムスタンプ(CAPTCHAを使っている場合のみ)
+- クライアントの識別子や、自動化の兆候・ブラウザ設定の不整合などの信号
+  (個人を特定できない形で収集される)
+- **JS統合SDK使用時は、マウス移動・キー入力・ページ上のフォーム操作といった
+  インタラクティビティ情報もパッシブに収集され、トークンに含まれる**
+  (別ヘッダーや別リクエストで送るのではなく、暗号化されたトークン本体に
+  エンコードされる)
+
+AWSはセキュリティ上の理由で、トークンの内容や暗号化プロセスの完全な説明は提供していない。
+
+**有効期限(immunity time)**
+
+[公式ドキュメント](https://docs.aws.amazon.com/waf/latest/developerguide/waf-tokens-immunity-times.html)によると:
+
+- Web ACLのデフォルト設定は**300秒(5分)**。challenge immunity timeの最小値も300秒
+  (CAPTCHA immunity timeの最小値は60秒、両者とも最大は3日)
+- 免除期間内は同じトークンが再利用される(毎リクエストごとに変わるわけではない)
+- 実際に2回連続でヘッダーを確認したところ、**完全に同一の値**だった(immunity time内だったため)
+- immunity timeが切れると、裏で自動的に再チャレンジが走り、新しいトークンに切り替わる
+  (セッションID部分も含めて変わる)
+- immunity timeはWeb ACL単位、または個別のCAPTCHA/Challengeルール単位で変更可能
+
+**注意**: このトークンは実際のブラウザセッションに紐づく値であり、有効期限内であれば
+リプレイ(再利用)して正規のリクエストとしてWAFを通過させることが技術的に可能。
+ブログや資料等で実際の値を掲載する場合は、末尾を省略するかダミー値に置き換えること。
+
+### 実験: トークンをcurlに手動で付けて再送(リプレイ)してみる
+
+ブラウザで発行された`x-aws-waf-token`の値をコピーし、curlのヘッダーに手動でセットして
+送信するとどうなるか実験した。
+
+**1回目: 期限切れのトークンを使用 → 失敗(403)**
+
+会話中で少し時間が経ってから貼り付けたトークンで試したところ、`403 Forbidden`が返った。
+おそらくimmunity time(デフォルト5分)を過ぎて`rejected:expired`扱いになったため。
+
+**2回目: 取得直後の新鮮なトークンを使用 → 成功(200)**
+
+```bash
+curl -i -X POST "https://xxxx.execute-api.ap-northeast-1.amazonaws.com/prod/login" \
+  -H "Content-Type: application/json" \
+  -H "x-aws-waf-token: <ブラウザから取得した直後のトークン>" \
+  -d '{"username":"test@example.com","password":"password123"}'
+```
+```
+HTTP/2 200
+{"message": "login ok (mock) for test@example.com"}
+```
+
+**分かったこと**: WAFトークンの検証で見ているのは「有効期限内かどうか」であり、
+送信元がブラウザかcurlかというクライアントの種類そのものではない。
+つまりATPが守っているのは「JS実行環境でchallenge.jsを完走してトークンを
+取得する能力があるか」であり、一度取得したトークンさえあれば、その後の送信手段
+(ブラウザ、curl、スクリプト等)は問われない。
+
+これは[公式ドキュメント](https://docs.aws.amazon.com/waf/latest/developerguide/waf-tokens-block-missing-tokens.html)でも裏付けられている仕様。
+「`AWSManagedRulesATPRuleSet`は`rejected`(トークンはあるが無効)ラベルのリクエストは
+自動でブロックするが、`absent`(トークンが無い)ラベルのリクエストは自動でブロックしない」
+と明記されている。つまりATP単体では「トークン無し」を捌けない設計であり、
+本ハンズオンで`BlockMissingTokenRule`を別途追加したのは公式が推奨する対処と一致する。
+
+これは実運用上の重要な含意でもある。攻撃者がブラウザ操作(または自動化ブラウザ)で
+一度トークンを取得できれば、その後は非ブラウザのツールでリプレイして
+大量リクエストを送ることも理論上可能。この対策は主にATP側のボリューム攻撃検知
+(`VolumetricIpHigh`/`VolumetricSession`)やトークンのブラウザフィンガープリント
+チェックが担っている
+(根拠: [How AWS WAF uses tokens](https://docs.aws.amazon.com/waf/latest/developerguide/waf-tokens-usage.html) —
+「ATPの高頻度・長時間セッション検知ルールは、有効かつchallengeタイムスタンプが
+期限切れでないトークンを要求する」)。JS統合はあくまで「入口のハードルを上げる」
+対策であり、それ単体で全てのリプレイ攻撃を防ぐわけではない。
 
 ---
 
@@ -300,7 +399,8 @@ x-amzn-errortype: ForbiddenException
    - Step6(ブラウザ+JS統合)のリクエスト → WAFトークンあり、ATPルールを通過
    - Step7(curl直接)のリクエスト → トークン無し、ATP関連ラベルが付与 / ブロック
 
-ログを有効化していれば、CloudWatch Logsで以下のようなラベルが確認できる:
+ログを有効化していれば、CloudWatch Logsで以下のようなラベルが確認できる
+(ラベル一覧の根拠: [AWS WAF Fraud Control account takeover prevention (ATP) rule group](https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-atp.html)):
 ```
 awswaf:managed:aws:atp:...
 ```
@@ -338,6 +438,34 @@ aws wafv2 get-sampled-requests \
 
 ## まとめ(振り返りポイント)
 
+### 前提: これはアプリケーション認証の代替ではない
+
+今回のログインAPIは検証ロジックを持たない完全なモック(常に`200`を返す)である。
+WAF/ATP/JS統合が担っているのは、あくまで**ネットワークの入口(エッジ)での一次フィルタ**
+であり、本来アプリケーション側に必要な認証機構の代替にはならない。
+
+```
+[WAF + ATP + JS統合]  ← 今回のハンズオンの範囲(エッジでの一次フィルタ)
+        ↓
+[アプリケーション認証: パスワードハッシュ、JWT/セッション、MFA、ロックアウト等]  ← 本来必須の層
+```
+
+本来の実装であれば以下のような要素が必要になり、これらはWAFでは代替できない。
+
+- パスワードのハッシュ化・照合(bcrypt等)
+- ログイン成功時のJWT/セッショントークン発行と、以降のAPIでの検証
+- ログイン失敗回数の制限(アカウントロックアウト)。ATPの`VolumetricSession`等と役割は
+  重なるが、WAFだけに依存せずアプリ側にも持たせるのが望ましい
+- MFA(多要素認証)。クレデンシャルスタッフィング対策として最も効果が高い
+  (漏洩したID/PWだけでは突破できなくなる)
+- レートリミット(API Gateway Usage Plan/Throttling、アプリ側でのIP/ユーザー単位の制限)
+
+WAF側だけで完結すると誤解すると、認証ロジック自体を疎かにする危険な設計判断に
+つながりかねない。今回の検証(トークンのリプレイが成立した点も含む)からも、
+JS統合単体で全ての攻撃を防げるわけではないことが分かる。
+
+### 検証結果のまとめ
+
 | 観点 | JS統合あり(ブラウザ経由) | JS統合なし(curl直接) |
 |---|---|---|
 | WAFトークン | あり | なし |
@@ -347,6 +475,14 @@ aws wafv2 get-sampled-requests \
 
 **ポイント**: WAFが見ているのは「ブラウザかどうか」ではなく「JSチャレンジ(人間らしさの証明)を通過したか」。
 curlが弾かれるのは、curlがJS実行能力を持たずトークンを取得できないことの結果である。
+
+**ただし**、取得済みのトークンをcurlに手動で付与すればWAFを通過できることも確認した
+(Step6の実験を参照)。つまりJS統合は「トークンを取得する能力(JS実行環境)があるか」
+までしか見ておらず、取得後のトークンの使い回し(リプレイ)自体は別の仕組み
+(有効期限、ATPのボリューム検知等)で補完する必要がある。JS統合は防御の1層目として
+「入口のコストを上げる」ものであり、単純な自動化攻撃には非常に有効だが、
+本気で回避しようとする攻撃者(ヘッドレスブラウザ+トークン再利用)には単体では不十分。
+ATPの他の検知ロジック(ボリューム攻撃、漏洩クレデンシャル一致)との併用が実用上必須。
 
 ---
 
